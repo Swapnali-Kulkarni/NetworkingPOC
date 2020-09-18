@@ -12,9 +12,9 @@
 int main(int argc, const char * argv[]) {
     @autoreleasepool {
         NetworkProvider *network = [[NetworkProvider alloc]init];
-        [network getNetworkInfo];
-        [network defaultRouter];
+        [network getWifiInfo];
         [network getInterfaceType];
+//        NSLog(@"wifi bytes received and bytes sent %@,",[network getDataCounters]);
         }
     return 0;
 }

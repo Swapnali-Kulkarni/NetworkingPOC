@@ -11,10 +11,9 @@
 NS_ASSUME_NONNULL_BEGIN
 
 @interface NetworkProvider : NSObject
-- (void)getNetworkInfo;
+- (void)getWifiInfo;
 - (void)getInterfaceType;
-- (void)defaultRouter;
-
+- (NSDictionary *)getDataCounters :(NSString *)bsdName;
 @end
 
 NS_ASSUME_NONNULL_END
