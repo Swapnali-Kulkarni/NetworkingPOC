@@ -19,20 +19,42 @@
 #include <sys/ioctl.h>
 #include <net/if.h>
 
+#define SSID_KEY @"SSID"
+#define INTERFACE_NAME_KEY @"Interface Name"
+#define INTERFACE_MODE_KEY @"Interface Mode"
+#define TXRATE_KEY @"TxRate"
+#define SIGNAL_STRENGTH_KEY @"Signal Strength"
+#define SECURITY_KEY @"Security Type"
+#define CHANNEL_NO_KEY @"Channel No"
+#define CHANNEl_BAND_KEY @"Channel Band"
+#define CHANNEL_WIDTH_KEY @"Channel Width"
+#define NOISE_MEASUREMENT_KEY @"Noise Measurement"
+#define ROUTER_ADDRESS_KEY @"Router Address"
+#define COUNTRY_CODE_KEY @"Country Code"
+#define WIFI_POWER_STATUS_KEY @"wifi power status"
+#define TRANSMIT_POWER_KEY @"Transmit Power"
+#define ACTIVE_PHY_MODE_KEY @"Active PHY Mode"
+#define INTERFACE_TYPE @"Interface Type"
+#define LOCAL_NAME @"Local Name"
+#define BSD_NAME @"BSD Name"
+#define BYTES_SENT @"Bytes Sent"
+#define BYTES_RECEIVED @"Bytes Received"
+#define PACKETS_SENT @"Packets Sent"
+#define PACKETS_RECEIVED @"Packets Received"
+#define LINK_SPEED @"Link Speed"
+#define ERROR_RECEIVED @"Error Received"
+#define ERROR_SENT @"Error Sent"
+#define PACKETS_SENT_MULTICAST @"Packets Sent Multicast"
+#define PACKETS_RECEIVED_MULTICAST @"Packets Received Multicast"
+#define SUPPORT_INTERFACE_TYPE @"Support Interface Type"
+#define SUPPORT_PROTOCOL_TYPE @"Support Protocol Type"
+#define HARDWARE_ADDRESS @"Hardware Address"
+#define IPV4 @"IPV4"
+#define IPV6 @"IPV6"
+
 @implementation NetworkProvider{
     CWInterface *interface;
     CFArrayRef allInterfaces;
-    
-    NSString *ssid;
-    NSString *interfaceName;
-    long interfaceMode;
-    double TxRate;
-    long signalStrength;
-    NSString *activeStatus;
-    NSString *security;
-    long channelNo;
-    long noiseMeasurement;
-    NSString *routerString;
 }
 
 - (id)init {
@@ -43,27 +65,55 @@
     return self;
 }
 
-- (void)getWifiInfo {
+- (NSDictionary *)getWifiInfo {
+        
+    NSMutableDictionary *wifiInfo = [[NSMutableDictionary alloc]init];
     
     /* SSID*/
-    ssid = [interface ssid];
+    NSString *ssid = [interface ssid];
     if(!ssid)
         ssid = @"NA";
+    [wifiInfo setObject:ssid forKey:SSID_KEY];
     
-    interfaceName = [interface interfaceName];
+    NSString *interfaceName = [interface interfaceName];
+    [wifiInfo setObject:interfaceName forKey:INTERFACE_NAME_KEY];
     
-    /* returns ssid, bssid, security type, rssi, channel, channel width, ibss*/
-//    NSLog(@"Networks With SSID :- %@",[interface scanForNetworksWithSSID:[interface ssidData] includeHidden:YES error:nil]);
-//    NSLog(@"scanForNetworksWithName - %@",[[wifiManager interface]scanForNetworksWithName:@"ZTE-3F5sGd" includeHidden:YES error:nil]);
+    long interfaceMode = (long)[interface interfaceMode];
+    [wifiInfo setObject:[NSString stringWithFormat:@"%ld",interfaceMode] forKey:INTERFACE_MODE_KEY];
+
+    double TxRate = [interface transmitRate];
+    [wifiInfo setObject:[NSString stringWithFormat:@"%f",TxRate] forKey:TXRATE_KEY];
+
+    long signalStrength = (long)[interface rssiValue];
+    [wifiInfo setObject:[NSString stringWithFormat:@"%ld",signalStrength] forKey:SIGNAL_STRENGTH_KEY];
+
+    CWChannel *channel = [interface wlanChannel];
+    long channelNo = [channel channelNumber];
+    [wifiInfo setObject:[NSString stringWithFormat:@"%ld",channelNo] forKey:CHANNEL_NO_KEY];
+
+    long channelBand  = [channel channelBand];
+    [wifiInfo setObject:[NSString stringWithFormat:@"%ld",channelBand] forKey:CHANNEl_BAND_KEY];
+
+    long channelWidth = [channel channelWidth];
+    [wifiInfo setObject:[NSString stringWithFormat:@"%ld",channelWidth] forKey:CHANNEL_WIDTH_KEY];
+
     
-    interfaceMode = (long)[interface interfaceMode];
- 
-    TxRate = [interface transmitRate];
+    long noiseMeasurement = (long)[interface noiseMeasurement];
+    [wifiInfo setObject:[NSString stringWithFormat:@"%ld",noiseMeasurement] forKey:NOISE_MEASUREMENT_KEY];
+
+    NSString *countryCode = [interface countryCode];
+    [wifiInfo setObject:countryCode forKey:COUNTRY_CODE_KEY];
     
-    signalStrength = (long)[interface rssiValue];
+    NSString *wifiPowerStatus = [interface powerOn]?@"ON":@"OFF";
+    [wifiInfo setObject:wifiPowerStatus forKey:WIFI_POWER_STATUS_KEY];
     
-    activeStatus = [interface serviceActive]?@"Active":@"Inactive";
+    long transmitPower = [interface transmitPower];
+    [wifiInfo setObject:[NSString stringWithFormat:@"%ld",transmitPower] forKey:TRANSMIT_POWER_KEY];
     
+    long activePHYMode = [interface activePHYMode];
+    [wifiInfo setObject:[NSString stringWithFormat:@"%ld",activePHYMode] forKey:ACTIVE_PHY_MODE_KEY];
+
+    NSString *security;
     switch ([interface security]) {
         case kCWSecurityWPA2Personal:
             security = @"Security WPA2 Personal";
@@ -93,32 +143,30 @@
             security = [NSString stringWithFormat:@"Security %ld",(long)[interface security]];
             break;
     }
+    [wifiInfo setObject:security forKey:SECURITY_KEY];
     
-    CWChannel *channel = [interface wlanChannel];
-    channelNo = [channel channelNumber];
-
-//    NSLog(@"Channel Band - %ld",(long)[channel channelBand]);
-//    NSLog(@"Channel Width - %ld",(long)[channel channelWidth]);
-    
-    noiseMeasurement = (long)[interface noiseMeasurement];
-    
-
     /* Router Address*/
-    routerString = @"NA";
+    NSString *routerString = @"NA";
     SCDynamicStoreRef ds = SCDynamicStoreCreate(kCFAllocatorDefault, CFSTR("myapp"), NULL, NULL);
     CFDictionaryRef dr = SCDynamicStoreCopyValue(ds, CFSTR("State:/Network/Global/IPv4"));
-    if (!dr)
-        return;
-    CFStringRef router = CFDictionaryGetValue(dr, CFSTR("Router"));
-    routerString = [NSString stringWithString:(__bridge NSString *)router];
-    if(!routerString)
-        routerString = @"NA";
-    CFRelease(dr);
+    if (dr){
+        CFStringRef router = CFDictionaryGetValue(dr, CFSTR("Router"));
+        routerString = [NSString stringWithString:(__bridge NSString *)router];
+        if(!routerString)
+            routerString = @"NA";
+        CFRelease(dr);
+    }
     CFRelease(ds);
+    [wifiInfo setObject:routerString forKey:ROUTER_ADDRESS_KEY];
+//    NSDictionary *wifiDict = [NSDictionary dictionaryWithObjectsAndKeys:ssid,SSID,interfaceName,INTERFACE_NAME,interfaceMode,INTERFACE_MODE,TxRate,TXRATE,signalStrength,SIGNAL_STRENGTH,security,SECURITY,channelNo,CHANNEL_NO,channelBand,CHANNEl_BAND,channelWidth,CHANNEL_WIDTH,noiseMeasurement,NOISE_MEASUREMENT,routerString,ROUTER, nil];
+    
 
+    return wifiInfo;
 }
 
 - (void)getInterfaceType {
+    
+    NSDictionary *wifiInfo = [self getWifiInfo];
     
     NSMutableArray *networkArray = [[NSMutableArray alloc]init];
     long count = CFArrayGetCount(allInterfaces);
@@ -129,11 +177,17 @@
         NSString *dictInterfaceMode = @"NA";
         NSString *dictTxRate = @"NA";
         NSString *dictSignalStrength = @"NA";
-        NSString *dictActiveStatus = @"NA";
         NSString *dictSecurity = @"NA";
         NSString *dictChannelNO = @"NA";
+        NSString *dictChannelBand = @"NA";
+        NSString *dictChannelWidth = @"NA";
         NSString *dictNoiceMeasurement = @"NA";
         NSString *dictRouterAddress = @"NA";
+        NSString *dictCountryCode = @"NA";
+        NSString *dictWifiPowerStatus = @"NA";
+        NSString *dictTransmitPower = @"NA";
+        NSString *dictActivePHYMode = @"NA";
+
         
         SCNetworkInterfaceRef interface = CFArrayGetValueAtIndex(allInterfaces, i);
         
@@ -154,21 +208,24 @@
         NSString *macAddress = (NSString *)SCNetworkInterfaceGetHardwareAddressString(interface);
 
         NSDictionary *bytesDict = [self getDataCounters:bsdName];
-        NSString *bytesSent = @"NA";
-        if ([bytesDict objectForKey:@"BytesSent"])
-            bytesSent = [bytesDict objectForKey:@"BytesSent"];
         
-        NSString *bytesReceived = @"NA";
-        if ([bytesDict objectForKey:@"BytesReceived"])
-            bytesReceived = [bytesDict objectForKey:@"BytesReceived"];
+        NSString *bytesSent = [bytesDict objectForKey:BYTES_SENT]?[bytesDict objectForKey:BYTES_SENT]:@"NA";
         
-        NSString *packetsSent = @"NA";
-        if ([bytesDict objectForKey:@"PacketsSent"])
-            packetsSent = [bytesDict objectForKey:@"PacketsSent"];
+        NSString *bytesReceived = [bytesDict objectForKey:BYTES_RECEIVED]?[bytesDict objectForKey:BYTES_RECEIVED]:@"NA";
         
-        NSString *packetsReceived = @"NA";
-        if ([bytesDict objectForKey:@"PacketsReceived"])
-            packetsReceived = [bytesDict objectForKey:@"PacketsReceived"];
+        NSString *packetsSent = [bytesDict objectForKey:PACKETS_SENT]?[bytesDict objectForKey:PACKETS_SENT]:@"NA";
+        
+        NSString *packetsReceived = [bytesDict objectForKey:PACKETS_RECEIVED]?[bytesDict objectForKey:PACKETS_RECEIVED]:@"NA";
+        
+        NSString *linkSpeed = [bytesDict objectForKey:LINK_SPEED]?[bytesDict objectForKey:LINK_SPEED]:@"NA";
+        
+        NSString *errorReceived = [bytesDict objectForKey:ERROR_RECEIVED]?[bytesDict objectForKey:ERROR_RECEIVED]:@"NA";
+        
+        NSString *errorSent = [bytesDict objectForKey:ERROR_SENT]?[bytesDict objectForKey:ERROR_SENT]:@"NA";
+        
+        NSString *packetsReceivedMulticast = [bytesDict objectForKey:PACKETS_SENT_MULTICAST]?[bytesDict objectForKey:PACKETS_SENT_MULTICAST]:@"NA";
+        
+        NSString *packetsSentMulticast = [bytesDict objectForKey:PACKETS_RECEIVED_MULTICAST]?[bytesDict objectForKey:PACKETS_RECEIVED_MULTICAST]:@"NA";
         
         char *ipv4 = getIpAddress((char *)[bsdName UTF8String],0);
         NSString *ipv4addr = [NSString stringWithFormat:@"%s" , ipv4];
@@ -178,41 +235,56 @@
         
         
         NSMutableDictionary *dict = [[NSMutableDictionary alloc]init];
-        [dict setObject:type forKey:@"Interface Type"];
-        [dict setObject:localName forKey:@"Local Name"];
-        [dict setObject:bsdName forKey:@"BSD Name"];
-        [dict setObject:supportInterfaceType forKey:@"Support Interface Type"];
-        [dict setObject:supportProtocolType forKey:@"Support Protocol Type"];
-        [dict setObject:macAddress forKey:@"Hardware Address"];
-        [dict setObject:bytesSent forKey:@"Bytes Sent"];
-        [dict setObject:bytesReceived forKey:@"Bytes Received"];
-        [dict setObject:ipv4addr forKey:@"IPV4"];
-        [dict setObject:ipv6addr forKey:@"IPV6"];
-        [dict setObject:packetsSent forKey:@"Packets Sent"];
-        [dict setObject:packetsReceived forKey:@"Packets Received"];
+        [dict setObject:type forKey:INTERFACE_TYPE];
+        [dict setObject:localName forKey:LOCAL_NAME];
+        [dict setObject:bsdName forKey:BSD_NAME];
+        [dict setObject:supportInterfaceType forKey:SUPPORT_INTERFACE_TYPE];
+        [dict setObject:supportProtocolType forKey:SUPPORT_PROTOCOL_TYPE];
+        [dict setObject:macAddress forKey:HARDWARE_ADDRESS];
+        [dict setObject:bytesSent forKey:BYTES_SENT];
+        [dict setObject:bytesReceived forKey:BYTES_RECEIVED];
+        [dict setObject:ipv4addr forKey:IPV4];
+        [dict setObject:ipv6addr forKey:IPV6];
+        [dict setObject:packetsSent forKey:PACKETS_SENT];
+        [dict setObject:packetsReceived forKey:PACKETS_RECEIVED];
+        [dict setObject:linkSpeed forKey:LINK_SPEED];
+        [dict setObject:errorReceived forKey:ERROR_RECEIVED];
+        [dict setObject:errorSent forKey:ERROR_SENT];
+        [dict setObject:packetsSentMulticast forKey:PACKETS_SENT_MULTICAST];
+        [dict setObject:packetsReceivedMulticast forKey:PACKETS_RECEIVED_MULTICAST];
         
-        if ([bsdName isEqualToString:interfaceName]) {
+        if ([bsdName isEqualToString:[wifiInfo objectForKey:INTERFACE_NAME_KEY]]) {
 
-            dictSsid = ssid;
-            dictInterfaceMode = [NSString stringWithFormat:@"%ld",interfaceMode];
-            dictTxRate = [NSString stringWithFormat:@"%fd",TxRate];
-            dictSignalStrength = [NSString stringWithFormat:@"%ld",signalStrength];
-            dictActiveStatus = activeStatus;
-            dictSecurity = security;
-            dictChannelNO = [NSString stringWithFormat:@"%ld",channelNo];
-            dictNoiceMeasurement = [NSString stringWithFormat:@"%ld",noiseMeasurement];
-            dictRouterAddress = routerString;
+            dictSsid = [wifiInfo objectForKey:SSID_KEY];
+            dictInterfaceMode = [wifiInfo objectForKey:INTERFACE_MODE_KEY];
+            dictTxRate = [wifiInfo objectForKey:TXRATE_KEY];
+            dictSignalStrength = [wifiInfo objectForKey:SIGNAL_STRENGTH_KEY];
+            dictSecurity = [wifiInfo objectForKey:SECURITY_KEY];
+            dictChannelNO = [wifiInfo objectForKey:CHANNEL_NO_KEY];
+            dictChannelBand = [wifiInfo objectForKey:CHANNEl_BAND_KEY];
+            dictChannelWidth = [wifiInfo objectForKey:CHANNEL_WIDTH_KEY];
+            dictNoiceMeasurement = [wifiInfo objectForKey:NOISE_MEASUREMENT_KEY];
+            dictRouterAddress = [wifiInfo objectForKey:ROUTER_ADDRESS_KEY];
+            dictCountryCode = [wifiInfo objectForKey:COUNTRY_CODE_KEY];
+            dictWifiPowerStatus = [wifiInfo objectForKey:WIFI_POWER_STATUS_KEY];
+            dictTransmitPower = [wifiInfo objectForKey:TRANSMIT_POWER_KEY];
+            dictActivePHYMode = [wifiInfo objectForKey:ACTIVE_PHY_MODE_KEY];
         }
         
-        [dict setObject:dictSsid forKey:@"ssid"];
-        [dict setObject:dictInterfaceMode forKey:@"interface mode"];
-        [dict setObject:dictTxRate forKey:@"TxRate"];
-        [dict setObject:dictSignalStrength forKey:@"Signal Strength"];
-        [dict setObject:dictActiveStatus forKey:@"Status"];
-        [dict setObject:dictSecurity forKey:@"Security Type"];
-        [dict setObject:dictChannelNO forKey:@"Channel no"];
-        [dict setObject:dictNoiceMeasurement forKey:@"Noice Measurement"];
-        [dict setObject:dictRouterAddress forKey:@"Router Address"];
+        [dict setObject:dictSsid forKey:SSID_KEY];
+        [dict setObject:dictInterfaceMode forKey:INTERFACE_MODE_KEY];
+        [dict setObject:dictTxRate forKey:TXRATE_KEY];
+        [dict setObject:dictSignalStrength forKey:SIGNAL_STRENGTH_KEY];
+        [dict setObject:dictSecurity forKey:SECURITY_KEY];
+        [dict setObject:dictChannelNO forKey:CHANNEL_NO_KEY];
+        [dict setObject:dictChannelBand forKey:CHANNEl_BAND_KEY];
+        [dict setObject:dictChannelWidth forKey:CHANNEL_WIDTH_KEY];
+        [dict setObject:dictNoiceMeasurement forKey:NOISE_MEASUREMENT_KEY];
+        [dict setObject:dictRouterAddress forKey:ROUTER_ADDRESS_KEY];
+        [dict setObject:dictCountryCode forKey:COUNTRY_CODE_KEY];
+        [dict setObject:dictWifiPowerStatus forKey:WIFI_POWER_STATUS_KEY];
+        [dict setObject:dictTransmitPower forKey:TRANSMIT_POWER_KEY];
+        [dict setObject:dictActivePHYMode forKey:ACTIVE_PHY_MODE_KEY];
         [networkArray addObject:dict];
     }
     
@@ -296,6 +368,11 @@ static char * getIpAddress(char *interface, bool value)
     int bytesReceived = 0;
     int packetsSent = 0;
     int packetsReceived = 0;
+    int linkSpeed = 0;
+    int errorReceived = 0;
+    int errorSent = 0;
+    int packetsReceivedMulticast = 0;
+    int packetsSentMulticast = 0;
 
     NSString *name=[[NSString alloc]init];
 
@@ -316,7 +393,13 @@ static char * getIpAddress(char *interface, bool value)
                     bytesReceived = networkStatisc->ifi_ibytes;
                     packetsSent = networkStatisc->ifi_opackets;
                     packetsReceived = networkStatisc->ifi_ipackets;
-                    return [NSDictionary dictionaryWithObjectsAndKeys:[NSNumber numberWithInt:bytesSent],@"BytesSent",[NSNumber numberWithInt:bytesReceived],@"BytesReceived",[NSNumber numberWithInt:packetsSent],@"PacketsSent",[NSNumber numberWithInt:packetsReceived],@"PacketsReceived", nil];
+                    linkSpeed = networkStatisc->ifi_baudrate;
+                    errorReceived = networkStatisc->ifi_ierrors;
+                    errorSent = networkStatisc->ifi_oerrors;
+                    packetsReceivedMulticast = networkStatisc->ifi_imcasts;
+                    packetsSentMulticast = networkStatisc->ifi_omcasts;
+                    
+                    return [NSDictionary dictionaryWithObjectsAndKeys:[NSString stringWithFormat:@"%d",bytesSent],BYTES_SENT,[NSString stringWithFormat:@"%d",bytesReceived],BYTES_RECEIVED,[NSString stringWithFormat:@"%d",packetsSent],PACKETS_SENT,[NSString stringWithFormat:@"%d",packetsReceived],PACKETS_RECEIVED,[NSString stringWithFormat:@"%d",linkSpeed],LINK_SPEED,[NSString stringWithFormat:@"%d",errorReceived],ERROR_RECEIVED,[NSString stringWithFormat:@"%d",errorSent],ERROR_SENT,[NSString stringWithFormat:@"%d",packetsSentMulticast],PACKETS_SENT_MULTICAST,[NSString stringWithFormat:@"%d",packetsReceivedMulticast],PACKETS_RECEIVED_MULTICAST, nil];
                 }
             }
             cursor = cursor->ifa_next;
