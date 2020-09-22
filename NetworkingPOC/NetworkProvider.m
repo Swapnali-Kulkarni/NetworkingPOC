@@ -18,6 +18,9 @@
 #include <netdb.h>
 #include <sys/ioctl.h>
 #include <net/if.h>
+#include <sys/sysctl.h>
+#include <netinet/in.h>
+#include <net/route.h>
 
 #define SSID_KEY @"SSID"
 #define INTERFACE_NAME_KEY @"Interface Name"
@@ -69,21 +72,29 @@
         
     NSMutableDictionary *wifiInfo = [[NSMutableDictionary alloc]init];
     
-    /* SSID*/
+    /* SSID of router */
     NSString *ssid = [interface ssid];
     if(!ssid)
         ssid = @"NA";
     [wifiInfo setObject:ssid forKey:SSID_KEY];
     
+    /* Interface name i.e. bsd name*/
     NSString *interfaceName = [interface interfaceName];
     [wifiInfo setObject:interfaceName forKey:INTERFACE_NAME_KEY];
     
+    /* Returns the current operating mode for the Wi-Fi interface */
     long interfaceMode = (long)[interface interfaceMode];
     [wifiInfo setObject:[NSString stringWithFormat:@"%ld",interfaceMode] forKey:INTERFACE_MODE_KEY];
 
+    /* Transmission Rate of wifi */
     double TxRate = [interface transmitRate];
     [wifiInfo setObject:[NSString stringWithFormat:@"%f",TxRate] forKey:TXRATE_KEY];
+    
+    /* current transmit power (mW) for the Wi-Fi interface.*/
+     long transmitPower = [interface transmitPower];
+     [wifiInfo setObject:[NSString stringWithFormat:@"%ld",transmitPower] forKey:TRANSMIT_POWER_KEY];
 
+    /* Current received signal strength indication (RSSI) measurement (dBm) for the Wi-Fi interface. */
     long signalStrength = (long)[interface rssiValue];
     [wifiInfo setObject:[NSString stringWithFormat:@"%ld",signalStrength] forKey:SIGNAL_STRENGTH_KEY];
 
@@ -97,22 +108,23 @@
     long channelWidth = [channel channelWidth];
     [wifiInfo setObject:[NSString stringWithFormat:@"%ld",channelWidth] forKey:CHANNEL_WIDTH_KEY];
 
-    
+    /* current noise measurement (dBm) for the Wi-Fi interface.*/
     long noiseMeasurement = (long)[interface noiseMeasurement];
     [wifiInfo setObject:[NSString stringWithFormat:@"%ld",noiseMeasurement] forKey:NOISE_MEASUREMENT_KEY];
 
-    NSString *countryCode = [interface countryCode];
+    /* currently adopted country code (ISO/IEC 3166-1:1997) for the Wi-Fi interface.*/
+    NSString *countryCode = [interface countryCode]?[interface countryCode]:@"NA";
     [wifiInfo setObject:countryCode forKey:COUNTRY_CODE_KEY];
     
+    /* Indicates the Wi-Fi interface power state. wifi is on or off */
     NSString *wifiPowerStatus = [interface powerOn]?@"ON":@"OFF";
     [wifiInfo setObject:wifiPowerStatus forKey:WIFI_POWER_STATUS_KEY];
     
-    long transmitPower = [interface transmitPower];
-    [wifiInfo setObject:[NSString stringWithFormat:@"%ld",transmitPower] forKey:TRANSMIT_POWER_KEY];
-    
+    /* currently active physical layer (PHY) mode of the Wi-Fi interface. if wifi is off returns 0*/
     long activePHYMode = [interface activePHYMode];
     [wifiInfo setObject:[NSString stringWithFormat:@"%ld",activePHYMode] forKey:ACTIVE_PHY_MODE_KEY];
 
+    /* Security type of wifi interface*/
     NSString *security;
     switch ([interface security]) {
         case kCWSecurityWPA2Personal:
@@ -158,8 +170,6 @@
     }
     CFRelease(ds);
     [wifiInfo setObject:routerString forKey:ROUTER_ADDRESS_KEY];
-//    NSDictionary *wifiDict = [NSDictionary dictionaryWithObjectsAndKeys:ssid,SSID,interfaceName,INTERFACE_NAME,interfaceMode,INTERFACE_MODE,TxRate,TXRATE,signalStrength,SIGNAL_STRENGTH,security,SECURITY,channelNo,CHANNEL_NO,channelBand,CHANNEl_BAND,channelWidth,CHANNEL_WIDTH,noiseMeasurement,NOISE_MEASUREMENT,routerString,ROUTER, nil];
-    
 
     return wifiInfo;
 }
@@ -191,10 +201,13 @@
         
         SCNetworkInterfaceRef interface = CFArrayGetValueAtIndex(allInterfaces, i);
         
+        /* Specifies the interface type. eg. IEEE80211 */
         NSString *type = (NSString *)SCNetworkInterfaceGetInterfaceType(interface);
         
+        /* local name of particular interface */
         NSString *localName = (NSString *)SCNetworkInterfaceGetLocalizedDisplayName(interface);
         
+        /* BSD name of particular interface. eg. en0, en1, bridge0,...*/
         NSString *bsdName = (NSString *)SCNetworkInterfaceGetBSDName(interface);
         
         /* Identifies all of the network interface types, such as PPP, that can be layered on top of the specified interface.*/
@@ -205,31 +218,43 @@
         /* Identifies all of the network protocol types, such as IPv4 and IPv6, that can be layered on top of the specified interface*/
         NSString *supportProtocolType = (NSString *)SCNetworkInterfaceGetSupportedProtocolTypes(interface);
 
+        /* Hardware address of particular interface */
         NSString *macAddress = (NSString *)SCNetworkInterfaceGetHardwareAddressString(interface);
 
         NSDictionary *bytesDict = [self getDataCounters:bsdName];
-        
+            
+        /* Number of bytes sent by the interface, since system started */
         NSString *bytesSent = [bytesDict objectForKey:BYTES_SENT]?[bytesDict objectForKey:BYTES_SENT]:@"NA";
         
+        /* Number of bytes received by the interface, since system started */
         NSString *bytesReceived = [bytesDict objectForKey:BYTES_RECEIVED]?[bytesDict objectForKey:BYTES_RECEIVED]:@"NA";
         
+        /* Number of packets sent by the interface */
         NSString *packetsSent = [bytesDict objectForKey:PACKETS_SENT]?[bytesDict objectForKey:PACKETS_SENT]:@"NA";
         
+        /* Number of packets received by the interface */
         NSString *packetsReceived = [bytesDict objectForKey:PACKETS_RECEIVED]?[bytesDict objectForKey:PACKETS_RECEIVED]:@"NA";
         
+        /* link speed of perticular interfae */
         NSString *linkSpeed = [bytesDict objectForKey:LINK_SPEED]?[bytesDict objectForKey:LINK_SPEED]:@"NA";
         
+        /* Error received by the innterface */
         NSString *errorReceived = [bytesDict objectForKey:ERROR_RECEIVED]?[bytesDict objectForKey:ERROR_RECEIVED]:@"NA";
         
+        /* Error sent by the interface */
         NSString *errorSent = [bytesDict objectForKey:ERROR_SENT]?[bytesDict objectForKey:ERROR_SENT]:@"NA";
         
+        /* packets received multicast */
         NSString *packetsReceivedMulticast = [bytesDict objectForKey:PACKETS_SENT_MULTICAST]?[bytesDict objectForKey:PACKETS_SENT_MULTICAST]:@"NA";
         
+        /* packets sent multicast */
         NSString *packetsSentMulticast = [bytesDict objectForKey:PACKETS_RECEIVED_MULTICAST]?[bytesDict objectForKey:PACKETS_RECEIVED_MULTICAST]:@"NA";
         
+        /* IPV4 address */
         char *ipv4 = getIpAddress((char *)[bsdName UTF8String],0);
         NSString *ipv4addr = [NSString stringWithFormat:@"%s" , ipv4];
         
+        /* IPV6 address */
         char *ipv6 = getIpAddress((char *)[bsdName UTF8String],1);
         NSString *ipv6addr = [NSString stringWithFormat:@"%s" , ipv6];
         
@@ -399,7 +424,7 @@ static char * getIpAddress(char *interface, bool value)
                     packetsReceivedMulticast = networkStatisc->ifi_imcasts;
                     packetsSentMulticast = networkStatisc->ifi_omcasts;
                     
-                    return [NSDictionary dictionaryWithObjectsAndKeys:[NSString stringWithFormat:@"%d",bytesSent],BYTES_SENT,[NSString stringWithFormat:@"%d",bytesReceived],BYTES_RECEIVED,[NSString stringWithFormat:@"%d",packetsSent],PACKETS_SENT,[NSString stringWithFormat:@"%d",packetsReceived],PACKETS_RECEIVED,[NSString stringWithFormat:@"%d",linkSpeed],LINK_SPEED,[NSString stringWithFormat:@"%d",errorReceived],ERROR_RECEIVED,[NSString stringWithFormat:@"%d",errorSent],ERROR_SENT,[NSString stringWithFormat:@"%d",packetsSentMulticast],PACKETS_SENT_MULTICAST,[NSString stringWithFormat:@"%d",packetsReceivedMulticast],PACKETS_RECEIVED_MULTICAST, nil];
+                    return [NSDictionary dictionaryWithObjectsAndKeys:[NSNumber numberWithInt:bytesSent],BYTES_SENT,[NSNumber numberWithInt:bytesReceived],BYTES_RECEIVED,[NSNumber numberWithInt:packetsSent],PACKETS_SENT,[NSNumber numberWithInt:packetsReceived],PACKETS_RECEIVED,[NSNumber numberWithInt:linkSpeed],LINK_SPEED,[NSNumber numberWithInt:errorReceived],ERROR_RECEIVED,[NSNumber numberWithInt:errorSent],ERROR_SENT,[NSNumber numberWithInt:packetsSentMulticast],PACKETS_SENT_MULTICAST,[NSNumber numberWithInt:packetsReceivedMulticast],PACKETS_RECEIVED_MULTICAST, nil];
                 }
             }
             cursor = cursor->ifa_next;
@@ -407,6 +432,56 @@ static char * getIpAddress(char *interface, bool value)
         freeifaddrs(addrs);
     }
     return [[NSDictionary alloc]init];
+}
+
+- (void)transmissionData {
+    
+
+    int mib[] = {
+        CTL_NET,
+        PF_ROUTE,
+        0,
+        0,
+        NET_RT_IFLIST2,
+        0
+    };
+    
+    size_t len;
+    if (sysctl(mib, 6, NULL, &len, NULL, 0) < 0) {
+        fprintf(stderr, "sysctl: %s\n", strerror(errno));
+        exit(1);
+    }
+    
+    char *buf = (char *)malloc(len);
+    if (sysctl(mib, 6, buf, &len, NULL, 0) < 0) {
+        fprintf(stderr, "sysctl: %s\n", strerror(errno));
+        exit(1);
+    }
+    
+    char *lim = buf + len;
+    char *next = NULL;
+    u_int64_t totalibytes = 0;
+    u_int64_t totalobytes = 0;
+    u_int64_t totaliPackets = 0;
+    u_int64_t totaloPackets = 0;
+    
+       for (next = buf; next < lim; ){
+                      
+           struct if_msghdr *ifm = (struct if_msghdr *)next;
+           next += ifm->ifm_msglen;
+                      
+           if (ifm->ifm_type == RTM_IFINFO2) {
+                              
+               struct if_msghdr2 *if2m = (struct if_msghdr2 *)ifm;
+               totalibytes += if2m->ifm_data.ifi_ibytes;
+               totalobytes += if2m->ifm_data.ifi_obytes;
+               totaliPackets += if2m->ifm_data.ifi_ipackets;
+               totaloPackets += if2m->ifm_data.ifi_opackets;
+
+           }
+       }
+    printf("total received - ibytes %qu\t sent - obytes %qu\n", totalibytes, totalobytes);
+    printf("total received - ipackets %qu\t sent - opackets %qu\n", totaliPackets, totaloPackets);
 }
 
 @end
