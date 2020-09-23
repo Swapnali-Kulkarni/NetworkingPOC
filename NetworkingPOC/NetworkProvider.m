@@ -58,6 +58,8 @@
 @implementation NetworkProvider{
     CWInterface *interface;
     CFArrayRef allInterfaces;
+    u_int64_t totalibytes;
+    u_int64_t totalobytes;
 }
 
 - (id)init {
@@ -69,7 +71,8 @@
 }
 
 - (NSDictionary *)getWifiInfo {
-        
+    totalobytes = 0;
+    totalibytes = 0;
     NSMutableDictionary *wifiInfo = [[NSMutableDictionary alloc]init];
     
     /* SSID of router */
@@ -318,7 +321,9 @@
     [payloadDict setObject:[self getTime] forKey:@"Date Time"];
     
     [payloadDict setObject:networkArray forKey:@"Network List"];
-    NSLog(@"payload dict %@",payloadDict);
+//    NSLog(@"payload dict %@",payloadDict);
+    NSLog(@"Total bytes sent %llu,\t total bytes received %llu",totalobytes,totalibytes);
+    NSLog(@"\n");
     NSError * err;
     NSData * jsonData = [NSJSONSerialization  dataWithJSONObject:payloadDict options:0 error:&err];
     NSString * payloadJson = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
@@ -389,54 +394,6 @@ static char * getIpAddress(char *interface, bool value)
     const struct ifaddrs *cursor;
     const struct if_data *networkStatisc;
 
-    int bytesSent = 0;
-    int bytesReceived = 0;
-    int packetsSent = 0;
-    int packetsReceived = 0;
-    int linkSpeed = 0;
-    int errorReceived = 0;
-    int errorSent = 0;
-    int packetsReceivedMulticast = 0;
-    int packetsSentMulticast = 0;
-
-    NSString *name=[[NSString alloc]init];
-
-    success = getifaddrs(&addrs) == 0;
-    if (success)
-    {
-        cursor = addrs;
-        while (cursor != NULL)
-        {
-            name=[NSString stringWithFormat:@"%s",cursor->ifa_name];
-
-            if (cursor->ifa_addr->sa_family == AF_LINK)
-            {
-                if ([name isEqualToString:bsdName])
-                {
-                    networkStatisc = (const struct if_data *) cursor->ifa_data;
-                    bytesSent = networkStatisc->ifi_obytes;
-                    bytesReceived = networkStatisc->ifi_ibytes;
-                    packetsSent = networkStatisc->ifi_opackets;
-                    packetsReceived = networkStatisc->ifi_ipackets;
-                    linkSpeed = networkStatisc->ifi_baudrate;
-                    errorReceived = networkStatisc->ifi_ierrors;
-                    errorSent = networkStatisc->ifi_oerrors;
-                    packetsReceivedMulticast = networkStatisc->ifi_imcasts;
-                    packetsSentMulticast = networkStatisc->ifi_omcasts;
-                    
-                    return [NSDictionary dictionaryWithObjectsAndKeys:[NSNumber numberWithInt:bytesSent],BYTES_SENT,[NSNumber numberWithInt:bytesReceived],BYTES_RECEIVED,[NSNumber numberWithInt:packetsSent],PACKETS_SENT,[NSNumber numberWithInt:packetsReceived],PACKETS_RECEIVED,[NSNumber numberWithInt:linkSpeed],LINK_SPEED,[NSNumber numberWithInt:errorReceived],ERROR_RECEIVED,[NSNumber numberWithInt:errorSent],ERROR_SENT,[NSNumber numberWithInt:packetsSentMulticast],PACKETS_SENT_MULTICAST,[NSNumber numberWithInt:packetsReceivedMulticast],PACKETS_RECEIVED_MULTICAST, nil];
-                }
-            }
-            cursor = cursor->ifa_next;
-        }
-        freeifaddrs(addrs);
-    }
-    return [[NSDictionary alloc]init];
-}
-
-- (void)transmissionData {
-    
-
     int mib[] = {
         CTL_NET,
         PF_ROUTE,
@@ -460,28 +417,116 @@ static char * getIpAddress(char *interface, bool value)
     
     char *lim = buf + len;
     char *next = NULL;
-    u_int64_t totalibytes = 0;
-    u_int64_t totalobytes = 0;
-    u_int64_t totaliPackets = 0;
-    u_int64_t totaloPackets = 0;
-    
-       for (next = buf; next < lim; ){
-                      
-           struct if_msghdr *ifm = (struct if_msghdr *)next;
-           next += ifm->ifm_msglen;
-                      
-           if (ifm->ifm_type == RTM_IFINFO2) {
-                              
-               struct if_msghdr2 *if2m = (struct if_msghdr2 *)ifm;
-               totalibytes += if2m->ifm_data.ifi_ibytes;
-               totalobytes += if2m->ifm_data.ifi_obytes;
-               totaliPackets += if2m->ifm_data.ifi_ipackets;
-               totaloPackets += if2m->ifm_data.ifi_opackets;
+    u_int64_t bytesSent = 0;
+    u_int64_t bytesReceived = 0;
+    int packetsSent = 0;
+    int packetsReceived = 0;
+    int linkSpeed = 0;
+    int errorReceived = 0;
+    int errorSent = 0;
+    int packetsReceivedMulticast = 0;
+    int packetsSentMulticast = 0;
 
-           }
-       }
-    printf("total received - ibytes %qu\t sent - obytes %qu\n", totalibytes, totalobytes);
-    printf("total received - ipackets %qu\t sent - opackets %qu\n", totaliPackets, totaloPackets);
+    NSString *name=[[NSString alloc]init];
+
+    success = getifaddrs(&addrs) == 0;
+    if (success)
+    {
+        cursor = addrs;
+        while (cursor != NULL)
+        {
+            name=[NSString stringWithFormat:@"%s",cursor->ifa_name];
+
+            if (cursor->ifa_addr->sa_family == AF_LINK)
+            {
+                if ([name isEqualToString:bsdName])
+                {
+                    networkStatisc = (const struct if_data *) cursor->ifa_data;
+                    packetsSent = networkStatisc->ifi_opackets;
+                    packetsReceived = networkStatisc->ifi_ipackets;
+                    linkSpeed = networkStatisc->ifi_baudrate;
+                    errorReceived = networkStatisc->ifi_ierrors;
+                    errorSent = networkStatisc->ifi_oerrors;
+                    packetsReceivedMulticast = networkStatisc->ifi_imcasts;
+                    packetsSentMulticast = networkStatisc->ifi_omcasts;
+
+                    for (next = buf; next < lim; ){
+                                         
+                        struct if_msghdr *ifm = (struct if_msghdr *)next;
+                        next += ifm->ifm_msglen;
+                                         
+                        if (ifm->ifm_type == RTM_IFINFO2) {
+                                        
+                            struct if_msghdr2 *if2m = (struct if_msghdr2 *)ifm;
+                            
+                                if(if2m->ifm_data.ifi_ipackets == networkStatisc->ifi_ipackets)
+                                {
+                                    bytesReceived = if2m->ifm_data.ifi_ibytes;
+                                    bytesSent = if2m->ifm_data.ifi_obytes;
+                                    totalibytes += if2m->ifm_data.ifi_ibytes;
+                                    totalobytes += if2m->ifm_data.ifi_obytes;
+                                }
+                            }
+                     }
+                    
+                    return [NSDictionary dictionaryWithObjectsAndKeys:[NSNumber numberWithUnsignedLongLong:bytesSent],BYTES_SENT,[NSNumber numberWithUnsignedLongLong:bytesReceived],BYTES_RECEIVED,[NSNumber numberWithInt:packetsSent],PACKETS_SENT,[NSNumber numberWithInt:packetsReceived],PACKETS_RECEIVED,[NSNumber numberWithInt:linkSpeed],LINK_SPEED,[NSNumber numberWithInt:errorReceived],ERROR_RECEIVED,[NSNumber numberWithInt:errorSent],ERROR_SENT,[NSNumber numberWithInt:packetsSentMulticast],PACKETS_SENT_MULTICAST,[NSNumber numberWithInt:packetsReceivedMulticast],PACKETS_RECEIVED_MULTICAST, nil];
+                }
+            }
+            cursor = cursor->ifa_next;
+        }
+        freeifaddrs(addrs);
+    }
+    return [[NSDictionary alloc]init];
 }
+
+//- (void)transmissionData {
+//
+//
+//    int mib[] = {
+//        CTL_NET,
+//        PF_ROUTE,
+//        0,
+//        0,
+//        NET_RT_IFLIST2,
+//        0
+//    };
+//
+//    size_t len;
+//    if (sysctl(mib, 6, NULL, &len, NULL, 0) < 0) {
+//        fprintf(stderr, "sysctl: %s\n", strerror(errno));
+//        exit(1);
+//    }
+//
+//    char *buf = (char *)malloc(len);
+//    if (sysctl(mib, 6, buf, &len, NULL, 0) < 0) {
+//        fprintf(stderr, "sysctl: %s\n", strerror(errno));
+//        exit(1);
+//    }
+//
+//    char *lim = buf + len;
+//    char *next = NULL;
+//    u_int64_t totalibytes = 0;
+//    u_int64_t totalobytes = 0;
+//    u_int64_t totaliPackets = 0;
+//    u_int64_t totaloPackets = 0;
+//
+//       for (next = buf; next < lim; ){
+//
+//           struct if_msghdr *ifm = (struct if_msghdr *)next;
+//           next += ifm->ifm_msglen;
+//
+//           if (ifm->ifm_type == RTM_IFINFO2) {
+//
+//               struct if_msghdr2 *if2m = (struct if_msghdr2 *)ifm;
+//               totalibytes += if2m->ifm_data.ifi_ibytes;
+//               totalobytes += if2m->ifm_data.ifi_obytes;
+//               totaliPackets += if2m->ifm_data.ifi_ipackets;
+//               totaloPackets += if2m->ifm_data.ifi_opackets;
+//
+//           }
+//       }
+//    printf("total received - ibytes %qu\t sent - obytes %qu\n", totalibytes, totalobytes);
+//    printf("total received - ipackets %qu\t sent - opackets %qu\n", totaliPackets, totaloPackets);
+//}
 
 @end
