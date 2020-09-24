@@ -459,7 +459,7 @@ static char * getIpAddress(char *interface, bool value)
                                         
                             struct if_msghdr2 *if2m = (struct if_msghdr2 *)ifm;
                             
-                                if(if2m->ifm_data.ifi_ipackets == networkStatisc->ifi_ipackets)
+                                if(if2m->ifm_data.ifi_ipackets == networkStatisc->ifi_ipackets && if2m->ifm_data.ifi_opackets == networkStatisc->ifi_opackets)
                                 {
                                     bytesReceived = if2m->ifm_data.ifi_ibytes;
                                     bytesSent = if2m->ifm_data.ifi_obytes;
@@ -479,54 +479,56 @@ static char * getIpAddress(char *interface, bool value)
     return [[NSDictionary alloc]init];
 }
 
-//- (void)transmissionData {
-//
-//
-//    int mib[] = {
-//        CTL_NET,
-//        PF_ROUTE,
-//        0,
-//        0,
-//        NET_RT_IFLIST2,
-//        0
-//    };
-//
-//    size_t len;
-//    if (sysctl(mib, 6, NULL, &len, NULL, 0) < 0) {
-//        fprintf(stderr, "sysctl: %s\n", strerror(errno));
-//        exit(1);
-//    }
-//
-//    char *buf = (char *)malloc(len);
-//    if (sysctl(mib, 6, buf, &len, NULL, 0) < 0) {
-//        fprintf(stderr, "sysctl: %s\n", strerror(errno));
-//        exit(1);
-//    }
-//
-//    char *lim = buf + len;
-//    char *next = NULL;
-//    u_int64_t totalibytes = 0;
-//    u_int64_t totalobytes = 0;
-//    u_int64_t totaliPackets = 0;
-//    u_int64_t totaloPackets = 0;
-//
-//       for (next = buf; next < lim; ){
-//
-//           struct if_msghdr *ifm = (struct if_msghdr *)next;
-//           next += ifm->ifm_msglen;
-//
-//           if (ifm->ifm_type == RTM_IFINFO2) {
-//
-//               struct if_msghdr2 *if2m = (struct if_msghdr2 *)ifm;
-//               totalibytes += if2m->ifm_data.ifi_ibytes;
-//               totalobytes += if2m->ifm_data.ifi_obytes;
-//               totaliPackets += if2m->ifm_data.ifi_ipackets;
-//               totaloPackets += if2m->ifm_data.ifi_opackets;
-//
-//           }
-//       }
-//    printf("total received - ibytes %qu\t sent - obytes %qu\n", totalibytes, totalobytes);
-//    printf("total received - ipackets %qu\t sent - opackets %qu\n", totaliPackets, totaloPackets);
-//}
+- (void)transmissionData {
+
+    int mib[] = {
+        CTL_NET,
+        PF_ROUTE,
+        0,
+        0,
+        NET_RT_IFLIST2,
+        0
+    };
+
+    size_t len;
+    if (sysctl(mib, 6, NULL, &len, NULL, 0) < 0) {
+        fprintf(stderr, "sysctl: %s\n", strerror(errno));
+        exit(1);
+    }
+
+    char *buf = (char *)malloc(len);
+    if (sysctl(mib, 6, buf, &len, NULL, 0) < 0) {
+        fprintf(stderr, "sysctl: %s\n", strerror(errno));
+        exit(1);
+    }
+
+    char *lim = buf + len;
+    char *next = NULL;
+    u_int64_t totalibytes = 0;
+    u_int64_t totalobytes = 0;
+    u_int64_t totaliPackets = 0;
+    u_int64_t totaloPackets = 0;
+
+       for (next = buf; next < lim; ){
+
+           struct if_msghdr *ifm = (struct if_msghdr *)next;
+//           NSLog(@"type %c \t Address %d\t Index %c",ifm->ifm_type,ifm->ifm_addrs,ifm->ifm_index);
+           
+           next += ifm->ifm_msglen;
+
+           if (ifm->ifm_type == RTM_IFINFO2) {
+
+               struct if_msghdr2 *if2m = (struct if_msghdr2 *)ifm;
+               totalibytes += if2m->ifm_data.ifi_ibytes;
+               totalobytes += if2m->ifm_data.ifi_obytes;
+               totaliPackets += if2m->ifm_data.ifi_ipackets;
+               totaloPackets += if2m->ifm_data.ifi_opackets;
+//               NSLog(@"ifi_physical %hhd",if2m->ifm_data.ifi_physical);
+
+           }
+       }
+    printf("total received - ibytes %qu\t sent - obytes %qu\n", totalibytes, totalobytes);
+    printf("total received - ipackets %qu\t sent - opackets %qu\n", totaliPackets, totaloPackets);
+}
 
 @end

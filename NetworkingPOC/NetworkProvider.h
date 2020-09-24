@@ -14,6 +14,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (NSDictionary *)getWifiInfo;
 - (void)getInterfaceType;
 - (NSDictionary *)getDataCounters :(NSString *)bsdName;
+- (void)transmissionData;
 @end
 
 NS_ASSUME_NONNULL_END

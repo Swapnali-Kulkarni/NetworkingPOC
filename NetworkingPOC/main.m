@@ -12,6 +12,7 @@
 int main(int argc, const char * argv[]) {
     @autoreleasepool {
         NetworkProvider *network = [[NetworkProvider alloc]init];
+        [network transmissionData];
         [network getInterfaceType];
         }
     return 0;
